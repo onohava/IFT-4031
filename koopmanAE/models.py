@@ -11,7 +11,6 @@ def gaussian_init_(n_units, std=1):
 class ConvEncoder(nn.Module):
     def __init__(self, channels, input_frames, latent_dim):
         super(ConvEncoder, self).__init__()
-        # Input: (Batch, Channels*Frames, 64, 64)
         self.effective_channels = channels * input_frames
 
         self.net = nn.Sequential(
@@ -33,7 +32,7 @@ class ConvEncoder(nn.Module):
 
         x = self.net(x)
         x = x.view(x.size(0), -1)
-        return self.fc(x)  # Linear activation for latent space (usually better for Physics)
+        return self.fc(x)
 
 
 class ConvDecoder(nn.Module):
