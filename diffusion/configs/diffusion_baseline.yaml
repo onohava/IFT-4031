@@ -1,0 +1,58 @@
+# Baseline Video Diffusion (NO KAE) - 4 GPU, <4 hours
+
+model:
+  name: video_diffusion_baseline
+
+  # Small U-Net for fast training
+  dim: 32
+  dim_mults: [1, 2, 4]  # Fewer levels
+  channels: 1  # Grayscale
+
+  # Fewer timesteps for faster training
+  timesteps: 250
+  sampling_timesteps: 50  # Fast sampling
+
+  # Video config
+  num_frames: 16
+  image_size: 64
+
+  # NO KAE - this is baseline
+  use_kae: false
+
+data:
+  dataset: moving_mnist
+  data_path: data/moving_mnist
+  num_frames: 16
+  batch_size: 16  # Per GPU, 64 total with 4 GPUs
+  num_workers: 4
+
+training:
+  max_epochs: 100
+  learning_rate: 2e-4
+  weight_decay: 0.0
+  gradient_clip_val: 1.0
+
+  # 4 GPU distributed
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+  # Checkpointing
+  save_every_n_epochs: 10
+  sample_every_n_epochs: 10
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-baseline-4gpu
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  monitor: train/loss
+  mode: min
+
+evaluation:
+  num_samples: 16
+  compute_fvd: true

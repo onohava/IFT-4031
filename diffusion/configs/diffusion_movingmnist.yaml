@@ -1,0 +1,57 @@
+# Video Diffusion config for MovingMNIST (in KAE latent space)
+
+model:
+  name: video_diffusion
+
+  # U-Net config
+  dim: 64
+  dim_mults: [1, 2, 4, 8]
+  channels: 1  # KAE latent channels
+
+  # Diffusion config
+  timesteps: 1000
+  sampling_timesteps: 250  # DDIM-style faster sampling
+
+  # Video config
+  num_frames: 16
+  image_size: 64
+
+kae:
+  # Path to pretrained KAE checkpoint
+  checkpoint_path: ./outputs/checkpoints/kae-best.ckpt
+  freeze: true  # Freeze KAE during diffusion training
+
+data:
+  dataset: moving_mnist
+  data_path: data/moving_mnist
+  num_frames: 16
+  batch_size: 16  # Smaller batch for video
+  num_workers: 4
+
+training:
+  max_epochs: 200
+  learning_rate: 1e-4
+  weight_decay: 0.0
+  gradient_clip_val: 1.0
+
+  # Distributed
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-movingmnist
+  log_every_n_steps: 100
+  save_top_k: 3
+
+checkpointing:
+  dirpath: ./outputs/checkpoints
+  monitor: val/loss
+  mode: min
+
+evaluation:
+  sample_every_n_epochs: 10
+  num_samples: 16
+  compute_fvd: true

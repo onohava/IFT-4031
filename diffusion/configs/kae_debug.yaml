@@ -1,0 +1,39 @@
+# Debug config - CPU or single GPU, small batch
+
+model:
+  name: kae
+  input_channels: 1
+  latent_dim: 32  # Smaller for debug
+  hidden_dims: [16, 32, 64]  # Smaller
+  image_size: 64
+
+data:
+  dataset: moving_mnist
+  data_path: data/moving_mnist
+  num_frames: 8  # Fewer frames for speed
+  batch_size: 4  # Small batch
+  num_workers: 0  # Avoid multiprocessing issues
+
+training:
+  max_epochs: 2  # Quick test
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  recon_weight: 1.0
+  dynamics_weight: 0.1
+
+  # CPU or single GPU
+  accelerator: auto  # Will use GPU if available, else CPU
+  devices: 1
+  strategy: auto
+  precision: 32  # Full precision for debugging
+
+logging:
+  project: koopman-diffusion
+  name: kae-debug
+  log_every_n_steps: 1
+  save_top_k: 1
+
+checkpointing:
+  dirpath: ./outputs/checkpoints/debug
+  monitor: val/loss
+  mode: min
