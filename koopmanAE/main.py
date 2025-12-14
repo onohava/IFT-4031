@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -30,11 +28,7 @@ def dice_loss(pred_logits, target, smooth=1.0):
 
 
 def get_criterion(device):
-    """
-    Returns a composite loss: 50% Focal Loss (Pixel) + 50% Dice Loss (Shape).
-    This handles the "Grey Blob" problem by forcing shape overlap.
-    """
-
+    # used for mnist:
     class CompositeLoss(nn.Module):
         def __init__(self):
             super().__init__()
@@ -46,7 +40,14 @@ def get_criterion(device):
 
             return 0.5 * focal + 0.5 * dice
 
-    return CompositeLoss().to(device)
+    if Config.DATASET_NAME == 'UCF-101':
+        # used for UCF101
+        return nn.MSELoss().to(device)
+    else:
+        # used for mnist
+        return CompositeLoss().to(device)
+
+
 
 
 def visualize_preds(model, batch, cfg, folder, epoch):
@@ -81,7 +82,7 @@ def train():
     cfg = Config()
     if not os.path.exists("results"): os.mkdir("results")
 
-    train_loader, _ = get_dataloader(cfg)
+    train_loader = get_dataloader(cfg)
     model = KoopmanAE(cfg).to(cfg.DEVICE)
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
 

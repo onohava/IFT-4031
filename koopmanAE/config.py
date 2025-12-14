@@ -4,7 +4,8 @@ import torch
 class Config:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    DATA_PATH = "./data"
+    # MovingMNIST or UCF101
+    DATASET_NAME = "UCF101"
     IMG_SIZE = 64
     CHANNELS = 1
 
@@ -19,7 +20,7 @@ class Config:
     # --- Training ---
     BATCH_SIZE = 32
     LR = 1e-3
-    EPOCHS = 200
+    EPOCHS = 10
 
     # hyperparameters from original paper
     LAMBDA_IDENTITY = 1.0  # reconstruction
