@@ -9,21 +9,30 @@ def gaussian_init_(n_units, std=1):
 
 
 class ConvEncoder(nn.Module):
-    def __init__(self, channels, input_frames, latent_dim):
+    def __init__(self, channels, input_frames, latent_dim, dataset_name='MovingMNIST'):
         super(ConvEncoder, self).__init__()
         self.effective_channels = channels * input_frames
+        self.dataset_name = dataset_name
 
-        self.net = nn.Sequential(
-            nn.Conv2d(self.effective_channels, 32, 4, stride=2, padding=1),  # 32x32
+        # Shared initial layers
+        layers = [
+            nn.Conv2d(self.effective_channels, 32, 4, stride=2, padding=1),  # -> 32x32
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(32, 64, 4, stride=2, padding=1),  # 16x16
+            nn.Conv2d(32, 64, 4, stride=2, padding=1),  # -> 16x16
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(64, 128, 4, stride=2, padding=1),  # 8x8
+            nn.Conv2d(64, 128, 4, stride=2, padding=1),  # -> 8x8
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(128, 256, 4, stride=2, padding=1),  # 4x4
-            nn.LeakyReLU(0.1, inplace=True),
-        )
-        self.fc = nn.Linear(256 * 4 * 4, latent_dim)
+        ]
+
+        if self.dataset_name == 'MovingMNIST':
+            layers.append(nn.Conv2d(128, 256, 4, stride=2, padding=1))  # -> 4x4
+            layers.append(nn.LeakyReLU(0.1, inplace=True))
+            self.flat_size = 256 * 4 * 4
+        else:
+            self.flat_size = 128 * 8 * 8
+
+        self.net = nn.Sequential(*layers)
+        self.fc = nn.Linear(self.flat_size, latent_dim)
 
     def forward(self, x):
         # x shape: [Batch, T, C, H, W] -> Flatten T and C
@@ -36,24 +45,41 @@ class ConvEncoder(nn.Module):
 
 
 class ConvDecoder(nn.Module):
-    def __init__(self, channels, latent_dim):
+    def __init__(self, channels, latent_dim, dataset_name='MovingMNIST'):
         super(ConvDecoder, self).__init__()
-        self.fc = nn.Linear(latent_dim, 256 * 4 * 4)
+        self.dataset_name = dataset_name
 
-        # Decoder outputs 1 frame
-        self.net = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),  # 8x8
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),  # 16x16
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),  # 32x32
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.ConvTranspose2d(32, channels, 4, stride=2, padding=1),  # 64x64
-        )
+        if self.dataset_name == 'MovingMNIST':
+            # Original Deep Decoder (Start from 4x4)
+            self.spatial_shape = (256, 4, 4)
+            self.fc = nn.Linear(latent_dim, 256 * 4 * 4)
+
+            self.net = nn.Sequential(
+                nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),  # -> 8x8
+                nn.LeakyReLU(0.1, inplace=True),
+                nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),  # -> 16x16
+                nn.LeakyReLU(0.1, inplace=True),
+                nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),  # -> 32x32
+                nn.LeakyReLU(0.1, inplace=True),
+                nn.ConvTranspose2d(32, channels, 4, stride=2, padding=1),  # -> 64x64
+            )
+        else:
+            # UCF-101: Shallower Decoder (Start from 8x8)
+            self.spatial_shape = (128, 8, 8)
+            self.fc = nn.Linear(latent_dim, 128 * 8 * 8)
+
+            self.net = nn.Sequential(
+                nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),  # -> 16x16
+                nn.LeakyReLU(0.1, inplace=True),
+                nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),  # -> 32x32
+                nn.LeakyReLU(0.1, inplace=True),
+                nn.ConvTranspose2d(32, channels, 4, stride=2, padding=1),  # -> 64x64
+            )
 
     def forward(self, z):
         x = self.fc(z)
-        x = x.view(x.size(0), 256, 4, 4)
+        # Reshape based on the architecture choice
+        x = x.view(x.size(0), *self.spatial_shape)
         return self.net(x)
 
 
@@ -85,8 +111,9 @@ class KoopmanAE(nn.Module):
         super(KoopmanAE, self).__init__()
         self.steps = cfg.PRED_FRAMES
 
-        self.encoder = ConvEncoder(cfg.CHANNELS, cfg.INPUT_FRAMES, cfg.LATENT_DIM)
-        self.decoder = ConvDecoder(cfg.CHANNELS, cfg.LATENT_DIM)
+        # Pass dataset name from config to switch architectures automatically
+        self.encoder = ConvEncoder(cfg.CHANNELS, cfg.INPUT_FRAMES, cfg.LATENT_DIM, dataset_name=cfg.DATASET_NAME)
+        self.decoder = ConvDecoder(cfg.CHANNELS, cfg.LATENT_DIM, dataset_name=cfg.DATASET_NAME)
 
         self.dynamics = Dynamics(cfg.LATENT_DIM, init_scale=0.99)
         self.backdynamics = DynamicsBack(cfg.LATENT_DIM, self.dynamics)

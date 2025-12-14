@@ -40,14 +40,12 @@ def get_criterion(device):
 
             return 0.5 * focal + 0.5 * dice
 
-    if Config.DATASET_NAME == 'UCF-101':
+    if Config.DATASET_NAME == 'UCF101':
         # used for UCF101
         return nn.MSELoss().to(device)
     else:
         # used for mnist
         return CompositeLoss().to(device)
-
-
 
 
 def visualize_preds(model, batch, cfg, folder, epoch):
@@ -62,7 +60,7 @@ def visualize_preds(model, batch, cfg, folder, epoch):
         for t in range(cfg.PRED_FRAMES):
             if t < cfg.INPUT_FRAMES:
                 axs[0, t].imshow(x_in[0, t, 0].cpu().numpy(), cmap='gray', vmin=0, vmax=1)
-            axs[0, t].axis('off');
+            axs[0, t].axis('off')
             axs[0, t].set_title('Input')
 
             axs[1, t].imshow(gt_future[0, t, 0].cpu().numpy(), cmap='gray', vmin=0, vmax=1)
@@ -71,7 +69,7 @@ def visualize_preds(model, batch, cfg, folder, epoch):
 
             img_pred = torch.sigmoid(preds[t][0, 0]).cpu().numpy()
             axs[2, t].imshow(img_pred, cmap='gray', vmin=0, vmax=1)
-            axs[2, t].axis('off');
+            axs[2, t].axis('off')
             axs[2, t].set_title('Pred')
 
         plt.savefig(f"{folder}/preds_epoch_{epoch}.png")
@@ -87,6 +85,8 @@ def train():
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
     criterion = get_criterion(cfg.DEVICE)
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=15)
 
     print("--- Starts Training ---")
 
@@ -155,6 +155,8 @@ def train():
             avg_fwd += loss_fwd.item()
             avg_bwd += loss_bwd.item()
             avg_consist += loss_consist.item()
+
+        scheduler.step(avg_loss / len(train_loader))
 
         print(f"Epoch {epoch + 1} | Total: {avg_loss / len(train_loader):.3f} | "
               f"Fwd: {avg_fwd / len(train_loader):.3f} | "

@@ -114,7 +114,7 @@ def get_dataloader(cfg):
         # Use the new custom class
         data = ActionVideoDataset(
             root="data/UCF-101",
-            actions=["JumpRope", "WalkingWithDog"],
+            actions=["ApplyLipstick"],
             frames_per_clip=16
         )
 

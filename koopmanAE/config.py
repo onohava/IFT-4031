@@ -15,9 +15,9 @@ class Config:
     TOTAL_FRAMES = INPUT_FRAMES + PRED_FRAMES
 
 
-    LATENT_DIM = 64
+    LATENT_DIM = 512
 
-    BATCH_SIZE = 32
+    BATCH_SIZE = 16
     LR = 1e-3
     EPOCHS = 500
 
