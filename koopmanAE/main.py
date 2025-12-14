@@ -161,7 +161,7 @@ def train():
               f"Bwd: {avg_bwd / len(train_loader):.3f} | "
               f"Consist: {avg_consist / len(train_loader):.4f}")
 
-        if (epoch + 1) % 5 == 0:
+        if (epoch + 1) % 25 == 0:
             visualize_preds(model, batch, cfg, "results", epoch + 1)
             torch.save(model.state_dict(), f"results/model_{epoch + 1}.pth")
 

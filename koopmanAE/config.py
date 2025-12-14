@@ -10,17 +10,16 @@ class Config:
     CHANNELS = 1
 
     # We take t frames input -> Predict next k frames
-    INPUT_FRAMES = 1
+    INPUT_FRAMES = 5
     PRED_FRAMES = 5
     TOTAL_FRAMES = INPUT_FRAMES + PRED_FRAMES
 
 
     LATENT_DIM = 64
 
-    # --- Training ---
     BATCH_SIZE = 32
     LR = 1e-3
-    EPOCHS = 10
+    EPOCHS = 500
 
     # hyperparameters from original paper
     LAMBDA_IDENTITY = 1.0  # reconstruction

@@ -192,15 +192,11 @@ if __name__ == "__main__":
     if not os.path.exists("results"): os.mkdir("results")
 
 
-    _, val_loader = get_dataloader(cfg)  # use val set if available, else train
-    if val_loader is None:
-        train_loader, _ = get_dataloader(cfg)
-        batch = next(iter(train_loader))
-    else:
-        batch = next(iter(val_loader))
+    train_loader= get_dataloader(cfg)
+    batch = next(iter(train_loader))
 
     # change model path with what you want to try
-    model = load_model(cfg, model_path="results/focal_dice_single_frame.pth")
+    model = load_model(cfg, model_path="results/model_10.pth")
 
     plot_predictions(model, batch, cfg)
     plot_spectrum(model, cfg)
