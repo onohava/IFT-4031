@@ -88,7 +88,7 @@ def train():
 
     criterion = get_criterion(cfg.DEVICE)
 
-    print("--- Starts Training (Composite Loss: Focal + Dice) ---")
+    print("--- Starts Training ---")
 
     for epoch in range(cfg.EPOCHS):
         model.train()
