@@ -202,7 +202,7 @@ if __name__ == "__main__":
     train_loader = get_dataloader(cfg)
     batch = next(iter(train_loader))
 
-    model_path = "results/ucf_lipstick.pth"
+    model_path = "results/trained_models_ucf/lipstick_single_frame.pth"
 
     try:
         model = load_model(cfg, model_path=model_path)

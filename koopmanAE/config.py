@@ -10,7 +10,7 @@ class Config:
     CHANNELS = 1
 
     # We take t frames input -> Predict next k frames
-    INPUT_FRAMES = 5
+    INPUT_FRAMES = 1
     PRED_FRAMES = 5
     TOTAL_FRAMES = INPUT_FRAMES + PRED_FRAMES
 
