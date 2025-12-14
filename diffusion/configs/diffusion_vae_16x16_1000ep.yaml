@@ -1,0 +1,47 @@
+# Improved diffusion training in VAE latent space (16x16x4)
+# Larger model, longer training
+
+model:
+  name: diffusion-vae-16x16
+  image_size: 16  # Latent spatial size
+  channels: 4     # Latent channels (16x16x4 = 1024)
+  num_frames: 16
+  dim: 128        # Increased from 64
+  dim_mults: [1, 2, 4, 8]  # Deeper network
+  timesteps: 1000
+  use_kae: false
+  use_vae: true
+
+vae:
+  checkpoint_path: outputs/checkpoints/last-v6.ckpt
+  latent_dim: 1024
+  hidden_dims: [64, 128]  # Must match VAE training config
+
+data:
+  data_path: data/moving_mnist
+  batch_size: 16  # Reduced due to larger model
+  num_frames: 16
+  num_workers: 4
+
+training:
+  max_epochs: 1000
+  learning_rate: 1e-4  # Lower for stability
+  gradient_clip_val: 1.0
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-vae-16x16-1000ep
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  filename: diffusion-vae-16x16-{epoch:02d}-{train_loss:.4f}
+  monitor: val_loss
+  mode: min
+  save_last: true
+  every_n_epochs: 100

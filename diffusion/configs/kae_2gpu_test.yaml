@@ -1,0 +1,40 @@
+# 2 GPU test config - SHORT test (~15 min)
+
+model:
+  name: kae
+  input_channels: 1
+  latent_dim: 64
+  hidden_dims: [32, 64, 128, 256]
+  image_size: 64
+
+data:
+  dataset: moving_mnist
+  data_path: data/moving_mnist
+  num_frames: 16
+  batch_size: 32
+  num_workers: 4
+
+training:
+  max_epochs: 10  # Short test
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  recon_weight: 1.0
+  dynamics_weight: 0.1
+
+  accelerator: gpu
+  devices: 2
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: kae-2gpu-test
+  log_every_n_steps: 25
+  save_top_k: 3
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  monitor: val/loss
+  mode: min
+  save_last: true  # Always save last checkpoint
+  every_n_epochs: 5  # Save every 5 epochs

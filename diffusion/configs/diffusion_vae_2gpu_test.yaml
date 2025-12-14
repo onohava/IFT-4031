@@ -1,0 +1,43 @@
+# 2 GPU diffusion test in VAE latent space
+
+model:
+  name: diffusion-vae-test
+  image_size: 4  # Latent spatial size (64 = 4*4*4)
+  channels: 4    # Latent channels (64 = 4*4*4)
+  num_frames: 16
+  dim: 32  # Small for testing
+  dim_mults: [1, 2]  # Fewer downsamples for small latent
+  timesteps: 100  # Fewer steps for testing
+  use_kae: false
+  use_vae: true
+
+vae:
+  checkpoint_path: outputs/checkpoints/last-v3.ckpt
+  latent_dim: 64
+
+data:
+  data_path: data/moving_mnist
+  batch_size: 8
+  num_frames: 16
+  num_workers: 4
+
+training:
+  max_epochs: 5  # Short test
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+  accelerator: gpu
+  devices: 2
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-vae-2gpu-test
+  log_every_n_steps: 10
+  save_top_k: 1
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  monitor: val_loss
+  mode: min
+  save_last: true

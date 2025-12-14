@@ -1,0 +1,41 @@
+# VAE baseline config - matching KAE for fair comparison
+# Same architecture, epochs, batch size, learning rate
+
+model:
+  name: vae
+  input_channels: 1
+  latent_dim: 64
+  hidden_dims: [32, 64, 128, 256]
+  image_size: 64
+
+data:
+  dataset: moving_mnist
+  data_path: data/moving_mnist
+  num_frames: 16
+  batch_size: 32
+  num_workers: 4
+
+training:
+  max_epochs: 100
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  recon_weight: 1.0
+  kl_weight: 1e-4  # beta-VAE style
+
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: vae-movingmnist
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  monitor: val/loss
+  mode: min
+  save_last: true
+  every_n_epochs: 10

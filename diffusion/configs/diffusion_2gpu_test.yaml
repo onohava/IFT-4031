@@ -1,0 +1,39 @@
+# 2 GPU diffusion test config - SHORT test (~15 min)
+# Pixel-space baseline (no KAE) for testing pipeline
+
+model:
+  name: diffusion-baseline-test
+  image_size: 64
+  channels: 1
+  num_frames: 16
+  dim: 32  # Small for testing
+  dim_mults: [1, 2, 4]
+  timesteps: 100  # Fewer steps for testing
+  use_kae: false
+
+data:
+  data_path: data/moving_mnist
+  batch_size: 8  # Small for testing
+  num_frames: 16
+  num_workers: 4
+
+training:
+  max_epochs: 5  # Short test
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+  accelerator: gpu
+  devices: 2
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-2gpu-test
+  log_every_n_steps: 10
+  save_top_k: 1
+
+checkpointing:
+  dirpath: outputs/checkpoints
+  monitor: val_loss
+  mode: min
+  save_last: true
