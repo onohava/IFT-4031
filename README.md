@@ -57,7 +57,7 @@ If video dynamics are linear in KAE latent space, diffusion may:
 | Dataset | Type | Status |
 |---------|------|--------|
 | **MovingMNIST** | Synthetic, 64x64, grayscale, 16 frames | Primary |
-| **Kinetics** | Real-world video | Stretch goal |
+| **UCF101** | Real-world video | Trained KAE on one action |
 
 Data location: `data/`
 
