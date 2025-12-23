@@ -13,6 +13,8 @@ import yaml
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.callbacks import TimeToConvergenceCallback, GPUMemoryCallback, InferenceBenchmarkCallback
+
 from src.models.diffusion import VideoDiffusionModel
 from src.models.kae import KoopmanAutoencoder, load_koopman_ae_from_checkpoint
 from src.models.vae import VideoVAE
@@ -138,6 +140,7 @@ def main(config_path: str):
         timesteps=config["model"]["timesteps"],
         use_kae=use_latent,
         kae_model=encoder_model,
+        window_stride=config["model"].get("window_stride", 1),  # Sliding window stride for multi-frame KAE
     )
 
     if config["model"].get("use_kae", False):
@@ -207,6 +210,16 @@ def main(config_path: str):
             save_top_k=config["logging"]["save_top_k"],
         ),
         LearningRateMonitor(logging_interval="step"),
+        TimeToConvergenceCallback(
+            monitor=config["checkpointing"]["monitor"],
+            mode=config["checkpointing"]["mode"],
+        ),
+        GPUMemoryCallback(log_every_n_steps=config["logging"].get("log_every_n_steps", 50)),
+        InferenceBenchmarkCallback(
+            num_warmup=2,
+            num_benchmark=8,
+            batch_size=config["data"].get("batch_size", 4),
+        ),
     ]
 
     logger = WandbLogger(

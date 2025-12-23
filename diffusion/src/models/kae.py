@@ -219,8 +219,8 @@ def load_koopman_ae_from_checkpoint(
         pred_frames=pred_frames,
     )
 
-    # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    # Load checkpoint (always load to CPU first, then move to device)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
 
     # Handle different checkpoint formats
     if isinstance(checkpoint, dict):
@@ -240,5 +240,8 @@ def load_koopman_ae_from_checkpoint(
 
     # Load into the underlying KoopmanAE
     model.kae.load_state_dict(state_dict, strict=True)
+
+    # Move to device
+    model = model.to(device)
 
     return model

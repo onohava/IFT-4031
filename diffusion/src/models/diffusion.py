@@ -19,9 +19,10 @@ class VideoDiffusionModel(nn.Module):
     - Single-frame (input_frames=1): Each frame encoded independently
     - Multi-frame (input_frames>1): Windows of frames encoded together
 
-    For multi-frame encoding with input_frames=5 and num_frames=15:
-    - 15 video frames -> 3 latent "frames" (each encoding 5 video frames)
-    - Diffusion operates on the compact latent sequence
+    For multi-frame encoding with input_frames=5 and num_frames=16:
+    - Sliding window (stride=1): 16 frames -> 12 latent "frames"
+    - Non-overlapping (stride=5): 16 frames -> 3 latent "frames"
+    - Diffusion operates on the latent sequence
     """
 
     def __init__(
@@ -34,6 +35,7 @@ class VideoDiffusionModel(nn.Module):
         timesteps: int = 1000,
         use_kae: bool = False,
         kae_model: Optional[nn.Module] = None,
+        window_stride: int = 1,  # Stride for sliding window (1 = maximum overlap)
     ):
         super().__init__()
 
@@ -48,6 +50,7 @@ class VideoDiffusionModel(nn.Module):
         self.num_frames = num_frames
         self.use_kae = use_kae
         self.kae_model = kae_model
+        self.window_stride = window_stride
 
         self.register_buffer('latent_min', torch.tensor(-0.5))
         self.register_buffer('latent_max', torch.tensor(0.5))
@@ -84,10 +87,12 @@ class VideoDiffusionModel(nn.Module):
             diffusion_channels = self.latent_C
             diffusion_size = self.latent_H
 
-            # For multi-frame KAE, diffusion operates on fewer temporal "frames"
+            # For multi-frame KAE, calculate number of latent frames based on sliding window
             if self.is_multiframe:
-                # Number of latent frames = video_frames // input_frames
-                self.num_latent_frames = num_frames // self.input_frames
+                # Sliding window: num_latent_frames = (num_frames - input_frames) // stride + 1
+                # E.g., 16 frames, input_frames=5, stride=1 -> (16-5)//1 + 1 = 12 latents
+                # E.g., 16 frames, input_frames=5, stride=5 -> (16-5)//5 + 1 = 3 latents (non-overlapping)
+                self.num_latent_frames = (num_frames - self.input_frames) // self.window_stride + 1
             else:
                 self.num_latent_frames = num_frames
         else:
@@ -129,7 +134,9 @@ class VideoDiffusionModel(nn.Module):
         Encode video frames to latent space.
 
         For single-frame KAE: each frame encoded independently
-        For multi-frame KAE: windows of input_frames encoded together
+        For multi-frame KAE: sliding window of input_frames encoded together
+            - stride=1: maximum overlap, most latent frames
+            - stride=input_frames: non-overlapping windows
 
         Args:
             x: Video tensor [B, T, C, H, W] or [B, C, T, H, W]
@@ -145,16 +152,15 @@ class VideoDiffusionModel(nn.Module):
 
         with torch.no_grad():
             if self.is_multiframe:
-                # Multi-frame encoding: encode windows of input_frames
-                num_windows = T // self.input_frames
-                # Trim to exact multiple
-                x_trimmed = x[:, :num_windows * self.input_frames]
+                # Multi-frame encoding with sliding window
+                # Calculate number of windows: (T - input_frames) // stride + 1
+                num_windows = (T - self.input_frames) // self.window_stride + 1
 
                 latents = []
                 for i in range(num_windows):
-                    start = i * self.input_frames
+                    start = i * self.window_stride
                     end = start + self.input_frames
-                    window = x_trimmed[:, start:end]  # [B, input_frames, C, H, W]
+                    window = x[:, start:end]  # [B, input_frames, C, H, W]
                     z_window = self.kae_model.encode(window)  # [B, latent_dim]
                     latents.append(z_window)
 
@@ -164,7 +170,12 @@ class VideoDiffusionModel(nn.Module):
                 x_flat = x.reshape(B * T, C, H, W)
                 encoded = self.kae_model.encode(x_flat)
                 if isinstance(encoded, tuple):
-                    z_flat = encoded[0]
+                    # VAE returns (mu, logvar) - use reparameterization if available
+                    mu, logvar = encoded
+                    if hasattr(self.kae_model, 'reparameterize'):
+                        z_flat = self.kae_model.reparameterize(mu, logvar)
+                    else:
+                        z_flat = mu  # Fallback to mu
                 else:
                     z_flat = encoded
                 z = z_flat.view(B, T, -1)  # [B, T, latent_dim]
@@ -182,7 +193,10 @@ class VideoDiffusionModel(nn.Module):
         Decode latent space back to video frames.
 
         For single-frame KAE: each latent decoded to one frame
-        For multi-frame KAE: each latent decoded to input_frames frames using Koopman dynamics
+        For multi-frame KAE with sliding window:
+            - Each latent generates input_frames using Koopman dynamics
+            - Overlapping regions are averaged for smooth transitions
+            - stride=1: maximum smoothness, output frames = (T_lat - 1) * stride + input_frames
 
         Args:
             z: Latent tensor [B, C_lat, T_lat, H_lat, W_lat]
@@ -200,16 +214,37 @@ class VideoDiffusionModel(nn.Module):
 
         with torch.no_grad():
             if self.is_multiframe and hasattr(self.kae_model, 'decode_with_dynamics'):
-                # Multi-frame decoding: use Koopman dynamics to generate multiple frames per latent
-                all_frames = []
-                for t in range(T_lat):
-                    z_t = z[:, t]  # [B, latent_dim]
-                    # Generate input_frames frames using Koopman dynamics
-                    frames = self.kae_model.decode_with_dynamics(z_t, num_frames=self.input_frames)
-                    all_frames.append(frames)  # [B, input_frames, C, H, W]
+                # Multi-frame decoding with overlap averaging
+                # Output frames = (T_lat - 1) * stride + input_frames
+                output_frames = (T_lat - 1) * self.window_stride + self.input_frames
 
-                # Concatenate all frame sequences
-                x = torch.cat(all_frames, dim=1)  # [B, T_lat * input_frames, C, H, W]
+                # Get image dimensions from first decode
+                z_0 = z[:, 0]
+                first_frames = self.kae_model.decode_with_dynamics(z_0, num_frames=self.input_frames)
+                _, _, C, H, W = first_frames.shape
+
+                # Accumulator for averaging overlapping frames
+                frame_sum = torch.zeros(B, output_frames, C, H, W, device=z.device)
+                frame_count = torch.zeros(B, output_frames, 1, 1, 1, device=z.device)
+
+                # Add first window's contribution
+                frame_sum[:, :self.input_frames] += first_frames
+                frame_count[:, :self.input_frames] += 1
+
+                # Process remaining windows
+                for t in range(1, T_lat):
+                    z_t = z[:, t]  # [B, latent_dim]
+                    frames = self.kae_model.decode_with_dynamics(z_t, num_frames=self.input_frames)
+
+                    # Position in output where this window starts
+                    start_pos = t * self.window_stride
+                    end_pos = start_pos + self.input_frames
+
+                    frame_sum[:, start_pos:end_pos] += frames
+                    frame_count[:, start_pos:end_pos] += 1
+
+                # Average overlapping regions
+                x = frame_sum / frame_count.clamp(min=1)
             else:
                 # Single-frame decoding: each latent -> one frame
                 z_flat = z.reshape(B * T_lat, latent_dim)

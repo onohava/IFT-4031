@@ -1,0 +1,75 @@
+# Video Diffusion with Multi-Frame KAE on UCF101 - 4 GPU
+# Uses lipstick.pth (multi-frame, INPUT_FRAMES=5) with sliding window encoding
+# 16 video frames -> 12 latents (stride=1) for optimal temporal resolution
+
+model:
+  name: diffusion-ucf101-multiframe-4gpu
+
+  # Latent space configuration for latent_dim=512
+  # 512 = 8 * 8 * 8 (C_lat=8, H_lat=8, W_lat=8)
+  image_size: 8
+  channels: 8
+
+  # Video configuration
+  num_frames: 16           # Video frames loaded
+
+  # Sliding window: (16 - 5) // 1 + 1 = 12 latent frames
+  window_stride: 1         # Maximum overlap for smoothest videos
+
+  # U-Net configuration
+  dim: 64
+  dim_mults: [1, 2, 4]
+
+  # Diffusion configuration
+  timesteps: 1000
+
+  # Use multi-frame KAE
+  use_kae: true
+  use_vae: false
+
+kae:
+  # Multi-frame KAE checkpoint (INPUT_FRAMES=5)
+  checkpoint_path: /private/home/soniajoseph/IFT-4031/koopmanAE/results/trained_models_ucf/lipstick.pth
+
+  # Model parameters
+  latent_dim: 512
+  input_channels: 1
+  image_size: 64
+  dataset_name: UCF101
+  input_frames: 5          # Multi-frame encoder
+  pred_frames: 5
+  freeze: true
+
+data:
+  dataset: ucf101
+  data_path: /datasets01/UCF101_Frames/frames
+  actions: ["ApplyLipstick"]
+  batch_size: 4            # Per GPU, effective batch = 16, gives ~5 batches/epoch
+  num_frames: 16
+  image_size: 64
+  grayscale: true
+  num_workers: 4
+
+training:
+  max_epochs: 500
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+
+  # Multi-GPU configuration
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-ucf101-multiframe-4gpu
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/diffusion_ucf101_multiframe
+  filename: diffusion-multiframe-{epoch:02d}-{train_loss:.4f}
+  monitor: train_loss
+  mode: min
+  save_last: true

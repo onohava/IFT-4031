@@ -40,7 +40,7 @@ data:
   dataset: ucf101
   data_path: /datasets01/UCF101_Frames/frames
   actions: ["ApplyLipstick"]
-  batch_size: 16          # Per GPU, so effective batch = 64
+  batch_size: 4           # Per GPU, effective batch = 16, gives ~5 batches/epoch
   num_frames: 16
   image_size: 64
   grayscale: true
