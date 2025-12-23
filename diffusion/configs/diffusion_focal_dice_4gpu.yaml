@@ -1,0 +1,67 @@
+# Video Diffusion with Single-Frame KAE on Moving MNIST - 4 GPU
+# Uses focal_dice_single_frame.pth (single-frame, INPUT_FRAMES=1)
+
+model:
+  name: diffusion-focal-dice-4gpu
+
+  # Latent space configuration for latent_dim=64
+  # 64 = 4 * 4 * 4 (C_lat=4, H_lat=4, W_lat=4)
+  image_size: 4
+  channels: 4
+
+  # Video configuration
+  num_frames: 16
+
+  # U-Net configuration
+  dim: 64
+  dim_mults: [1, 2, 4]
+
+  # Diffusion configuration
+  timesteps: 1000
+
+  # Use single-frame KAE
+  use_kae: true
+  use_vae: false
+
+kae:
+  # Single-frame KAE checkpoint
+  checkpoint_path: /private/home/soniajoseph/IFT-4031/koopmanAE/results/trained_models_mnist/focal_dice_single_frame.pth
+
+  # Model parameters
+  latent_dim: 64
+  input_channels: 1
+  image_size: 64
+  dataset_name: MovingMNIST
+  input_frames: 1
+  pred_frames: 5
+  freeze: true
+
+data:
+  data_path: /private/home/soniajoseph/IFT-4031/diffusion/data/moving_mnist
+  batch_size: 32          # Per GPU, effective batch = 128
+  num_frames: 16
+  num_workers: 4
+
+training:
+  max_epochs: 200
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+
+  # Multi-GPU configuration
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-focal-dice-4gpu
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/diffusion_focal_dice_4gpu
+  filename: diffusion-focal-dice-{epoch:02d}-{train_loss:.4f}
+  monitor: train_loss
+  mode: min
+  save_last: true

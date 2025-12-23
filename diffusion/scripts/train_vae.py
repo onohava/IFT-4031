@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.vae import VideoVAE
 from src.data.moving_mnist import create_moving_mnist_dataloader
+from src.data.ucf101 import create_ucf101_dataloader
 from src.training.trainer import VAELightningModule
 
 
@@ -40,20 +41,45 @@ def main(config_path: str):
         kl_weight=float(config["training"]["kl_weight"]),
     )
 
-    train_loader = create_moving_mnist_dataloader(
-        data_path=config["data"]["data_path"],
-        batch_size=config["data"]["batch_size"],
-        num_frames=config["data"]["num_frames"],
-        train=True,
-        num_workers=config["data"]["num_workers"],
-    )
-    val_loader = create_moving_mnist_dataloader(
-        data_path=config["data"]["data_path"],
-        batch_size=config["data"]["batch_size"],
-        num_frames=config["data"]["num_frames"],
-        train=False,
-        num_workers=config["data"]["num_workers"],
-    )
+    # Create data loaders based on dataset type
+    dataset_type = config["data"].get("dataset", "moving_mnist")
+
+    if dataset_type == "ucf101":
+        train_loader = create_ucf101_dataloader(
+            root=config["data"]["data_path"],
+            actions=config["data"].get("actions"),
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            image_size=config["data"].get("image_size", 64),
+            train=True,
+            grayscale=config["data"].get("grayscale", True),
+            num_workers=config["data"]["num_workers"],
+        )
+        val_loader = create_ucf101_dataloader(
+            root=config["data"]["data_path"],
+            actions=config["data"].get("actions"),
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            image_size=config["data"].get("image_size", 64),
+            train=False,
+            grayscale=config["data"].get("grayscale", True),
+            num_workers=config["data"]["num_workers"],
+        )
+    else:
+        train_loader = create_moving_mnist_dataloader(
+            data_path=config["data"]["data_path"],
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            train=True,
+            num_workers=config["data"]["num_workers"],
+        )
+        val_loader = create_moving_mnist_dataloader(
+            data_path=config["data"]["data_path"],
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            train=False,
+            num_workers=config["data"]["num_workers"],
+        )
 
     ckpt_config = config["checkpointing"]
     callbacks = [

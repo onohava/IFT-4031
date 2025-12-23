@@ -1,0 +1,70 @@
+# Video Diffusion with Multi-Frame KAE on Moving MNIST
+# Uses focal_dice_loss.pth (multi-frame, INPUT_FRAMES=5)
+
+model:
+  name: diffusion-multiframe-mnist
+
+  # Latent space configuration for latent_dim=64
+  # 64 = 4 * 4 * 4 (C_lat=4, H_lat=4, W_lat=4)
+  image_size: 4
+  channels: 4
+
+  # Video configuration
+  # 15 video frames / 5 input_frames = 3 latent frames
+  num_frames: 15
+
+  # U-Net configuration
+  dim: 64
+  dim_mults: [1, 2, 4]
+
+  # Diffusion configuration
+  timesteps: 1000
+
+  # Use multi-frame KAE
+  use_kae: true
+  use_vae: false
+
+kae:
+  # Multi-frame KAE checkpoint (INPUT_FRAMES=5)
+  checkpoint_path: /private/home/soniajoseph/IFT-4031/koopmanAE/results/trained_models_mnist/focal_dice_loss.pth
+
+  # Model parameters (must match checkpoint)
+  latent_dim: 64
+  input_channels: 1
+  image_size: 64
+  dataset_name: MovingMNIST
+  input_frames: 5    # Multi-frame: 5 frames per encoding window
+  pred_frames: 5
+
+  # Freeze KAE during diffusion training
+  freeze: true
+
+data:
+  data_path: /private/home/soniajoseph/IFT-4031/diffusion/data/moving_mnist
+  batch_size: 32
+  num_frames: 15     # Must be divisible by input_frames (15 / 5 = 3 latent frames)
+  num_workers: 4
+
+training:
+  max_epochs: 200
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+
+  # GPU configuration
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-multiframe-mnist
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/diffusion_multiframe_mnist
+  filename: diffusion-multiframe-{epoch:02d}-{train_loss:.4f}
+  monitor: train_loss
+  mode: min
+  save_last: true

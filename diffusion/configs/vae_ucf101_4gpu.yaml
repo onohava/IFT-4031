@@ -1,0 +1,45 @@
+# VAE Training on UCF101 (ApplyLipstick) - 4 GPU
+# This trains a VAE baseline to compare against KAE
+
+model:
+  name: vae-ucf101
+  input_channels: 1
+  latent_dim: 512         # Match KAE latent dim for fair comparison
+  hidden_dims: [32, 64, 128, 256]
+  image_size: 64
+
+data:
+  dataset: ucf101
+  data_path: /datasets01/UCF101_Frames/frames
+  actions: ["ApplyLipstick"]
+  batch_size: 32          # Per GPU, effective = 128
+  num_frames: 16
+  image_size: 64
+  grayscale: true
+  num_workers: 4
+
+training:
+  max_epochs: 200
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  recon_weight: 1.0
+  kl_weight: 1e-4
+
+  # Multi-GPU configuration
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: vae-ucf101-4gpu
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/vae_ucf101
+  monitor: val/loss
+  mode: min
+  save_last: true
+  every_n_epochs: 10

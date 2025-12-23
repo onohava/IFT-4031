@@ -1,0 +1,70 @@
+# Video Diffusion trained on pretrained KoopmanAE latents (focal_dice_loss model)
+# Uses MovingMNIST dataset
+
+model:
+  name: diffusion-focal-dice
+
+  # Latent space configuration
+  # latent_dim=64 factorizes as [4, 4, 4]
+  image_size: 4       # Latent spatial size H=W=4
+  channels: 4         # Latent channels C=4
+
+  # Video configuration
+  num_frames: 16
+
+  # U-Net configuration
+  dim: 64
+  dim_mults: [1, 2, 4]
+
+  # Diffusion configuration
+  timesteps: 1000
+
+  # Use KAE
+  use_kae: true
+  use_vae: false
+
+kae:
+  # Path to pretrained KoopmanAE checkpoint (absolute path)
+  # Using single_frame version which was trained with INPUT_FRAMES=1
+  checkpoint_path: /private/home/soniajoseph/IFT-4031/koopmanAE/results/trained_models_mnist/focal_dice_single_frame.pth
+
+  # Must match the checkpoint (verified: latent_dim=64)
+  latent_dim: 64
+  input_channels: 1
+  image_size: 64
+  dataset_name: MovingMNIST
+  input_frames: 1
+  pred_frames: 5
+
+  # Freeze KAE during diffusion training
+  freeze: true
+
+data:
+  data_path: /private/home/soniajoseph/IFT-4031/diffusion/data/moving_mnist
+  batch_size: 32
+  num_frames: 16
+  num_workers: 4
+
+training:
+  max_epochs: 200
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+
+  # Distributed training - adjust based on available GPUs
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  precision: 16-mixed
+
+logging:
+  project: koopman-diffusion
+  name: diffusion-focal-dice
+  log_every_n_steps: 50
+  save_top_k: 3
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/diffusion_focal_dice
+  filename: diffusion-focal-dice-{epoch:02d}-{train_loss:.4f}
+  monitor: train_loss
+  mode: min
+  save_last: true

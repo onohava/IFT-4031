@@ -1,0 +1,48 @@
+# Quick test config for diffusion training
+model:
+  name: diffusion-focal-dice-test
+  image_size: 4
+  channels: 4
+  num_frames: 16
+  dim: 32
+  dim_mults: [1, 2]
+  timesteps: 100
+  use_kae: true
+  use_vae: false
+
+kae:
+  checkpoint_path: /private/home/soniajoseph/IFT-4031/koopmanAE/results/trained_models_mnist/focal_dice_single_frame.pth
+  latent_dim: 64
+  input_channels: 1
+  image_size: 64
+  dataset_name: MovingMNIST
+  input_frames: 1
+  pred_frames: 5
+  freeze: true
+
+data:
+  data_path: /private/home/soniajoseph/IFT-4031/diffusion/data/moving_mnist
+  batch_size: 4
+  num_frames: 16
+  num_workers: 2
+
+training:
+  max_epochs: 1
+  learning_rate: 2e-4
+  gradient_clip_val: 1.0
+  accelerator: cpu
+  devices: 1
+  strategy: auto
+  precision: 32
+
+logging:
+  project: koopman-diffusion-test
+  name: test-run
+  log_every_n_steps: 1
+  save_top_k: 1
+
+checkpointing:
+  dirpath: /private/home/soniajoseph/IFT-4031/diffusion/outputs/checkpoints/test
+  filename: test-{epoch:02d}
+  monitor: train_loss
+  mode: min

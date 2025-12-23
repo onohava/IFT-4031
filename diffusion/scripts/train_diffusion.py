@@ -14,9 +14,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.diffusion import VideoDiffusionModel
-from src.models.kae import KoopmanAutoencoder
+from src.models.kae import KoopmanAutoencoder, load_koopman_ae_from_checkpoint
 from src.models.vae import VideoVAE
 from src.data.moving_mnist import create_moving_mnist_dataloader
+from src.data.ucf101 import create_ucf101_dataloader
 
 
 class DiffusionLightningModule(pl.LightningModule):
@@ -57,23 +58,22 @@ class DiffusionLightningModule(pl.LightningModule):
 
 
 def load_kae_from_checkpoint(checkpoint_path: str, config: dict) -> KoopmanAutoencoder:
-    kae = KoopmanAutoencoder(
-        input_channels=1,
+    """
+    Load KoopmanAutoencoder from a koopmanAE checkpoint.
+
+    Handles the checkpoint format from koopmanAE/main.py which saves
+    raw state_dict with torch.save(model.state_dict(), path).
+    """
+    return load_koopman_ae_from_checkpoint(
+        checkpoint_path=checkpoint_path,
         latent_dim=config.get("latent_dim", 64),
-        hidden_dims=config.get("hidden_dims", [32, 64, 128, 256]),
-        image_size=64,
+        input_channels=config.get("input_channels", 1),
+        image_size=config.get("image_size", 64),
+        dataset_name=config.get("dataset_name", "MovingMNIST"),
+        input_frames=config.get("input_frames", 1),
+        pred_frames=config.get("pred_frames", 5),
+        device="cpu",
     )
-
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
-    if "state_dict" in checkpoint:
-        state_dict = {k.replace("model.", ""): v
-                      for k, v in checkpoint["state_dict"].items()
-                      if k.startswith("model.")}
-        kae.load_state_dict(state_dict)
-    else:
-        kae.load_state_dict(checkpoint)
-
-    return kae
 
 
 def load_vae_from_checkpoint(checkpoint_path: str, config: dict) -> VideoVAE:
@@ -106,11 +106,20 @@ def main(config_path: str):
     if config["model"].get("use_kae", False):
         kae_config = config.get("kae", {})
         checkpoint_path = kae_config.get("checkpoint_path")
-        if checkpoint_path and Path(checkpoint_path).exists():
-            print(f"Loading KAE from {checkpoint_path}")
-            encoder_model = load_kae_from_checkpoint(checkpoint_path, kae_config)
+        if checkpoint_path:
+            # Resolve relative paths from script directory
+            checkpoint_path = Path(checkpoint_path)
+            if not checkpoint_path.is_absolute():
+                checkpoint_path = Path(__file__).parent / checkpoint_path
+            checkpoint_path = checkpoint_path.resolve()
+
+            if checkpoint_path.exists():
+                print(f"Loading KAE from {checkpoint_path}")
+                encoder_model = load_kae_from_checkpoint(str(checkpoint_path), kae_config)
+            else:
+                raise FileNotFoundError(f"KAE checkpoint not found at {checkpoint_path}")
         else:
-            raise FileNotFoundError(f"KAE checkpoint not found at {checkpoint_path}")
+            raise ValueError("KAE checkpoint_path not specified in config")
     elif config["model"].get("use_vae", False):
         vae_config = config.get("vae", {})
         checkpoint_path = vae_config.get("checkpoint_path")
@@ -148,20 +157,46 @@ def main(config_path: str):
         learning_rate=float(config["training"]["learning_rate"]),
     )
 
-    train_loader = create_moving_mnist_dataloader(
-        data_path=config["data"]["data_path"],
-        batch_size=config["data"]["batch_size"],
-        num_frames=config["data"]["num_frames"],
-        train=True,
-        num_workers=config["data"]["num_workers"],
-    )
-    val_loader = create_moving_mnist_dataloader(
-        data_path=config["data"]["data_path"],
-        batch_size=config["data"]["batch_size"],
-        num_frames=config["data"]["num_frames"],
-        train=False,
-        num_workers=config["data"]["num_workers"],
-    )
+    # Create data loaders based on dataset type
+    dataset_type = config["data"].get("dataset", "moving_mnist")
+
+    if dataset_type == "ucf101":
+        train_loader = create_ucf101_dataloader(
+            root=config["data"]["data_path"],
+            actions=config["data"].get("actions"),
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            image_size=config["data"].get("image_size", 64),
+            train=True,
+            grayscale=config["data"].get("grayscale", True),
+            num_workers=config["data"]["num_workers"],
+        )
+        val_loader = create_ucf101_dataloader(
+            root=config["data"]["data_path"],
+            actions=config["data"].get("actions"),
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            image_size=config["data"].get("image_size", 64),
+            train=False,
+            grayscale=config["data"].get("grayscale", True),
+            num_workers=config["data"]["num_workers"],
+        )
+    else:
+        # Default: MovingMNIST
+        train_loader = create_moving_mnist_dataloader(
+            data_path=config["data"]["data_path"],
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            train=True,
+            num_workers=config["data"]["num_workers"],
+        )
+        val_loader = create_moving_mnist_dataloader(
+            data_path=config["data"]["data_path"],
+            batch_size=config["data"]["batch_size"],
+            num_frames=config["data"]["num_frames"],
+            train=False,
+            num_workers=config["data"]["num_workers"],
+        )
 
     callbacks = [
         ModelCheckpoint(
